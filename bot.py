@@ -5,19 +5,24 @@ import requests
 from datetime import datetime
 
 from telebot import types
-from config import BOT_KEY, WEATHER_URL
+from config import *
 
 # Constants
 bot = telebot.TeleBot(BOT_KEY, parse_mode=None)
+singapore_coordinates = [1.3521, 103.8198]
+water_vapour_pressure = 0.33
+wind_speed_multiplier = 0.7
+average_multiplier = 4
 
 ## Weather
 twoHour_URL = WEATHER_URL
+daily_URL = DAILY_FORECAST_URL
 
 ## Functions
 def getDegrees(lat, lon):
 
-	lat1 = math.radians(1.3521)
-	lon1 = math.radians(103.8198)
+	lat1 = math.radians(singapore_coordinates[0])
+	lon1 = math.radians(singapore_coordinates[1])
 	lat2 = math.radians(lat)
 	lon2 = math.radians(lon)
 
@@ -53,6 +58,19 @@ def addCompassLocation():
 
 	return area_metadata
 
+def heatIndexCalculator(avgTemp, avgHumidity, avgWind):
+
+	## In that equation “AT” stands for “apparent temperature” (the “feels like” reading).
+	## “Ta” is the ambient temperature reading, the baseline temperature measure.
+	## “E” indicates a specific measure of humidity called “water vapour pressure” which is multiplied by 0.33
+	## “WS” is the current wind speed multiplied by 0.7.
+
+	## AT: apparent temp, Ta: ambient temp, E: water vapour pressure (humidity), WS: wind speed
+	## reference: https://www.smh.com.au/nationa\\l/what-is-the-feels-like-temperature-20220609-p5asjy.html
+
+	# AT (apparent temp) = Ta (ambient temp) + 0.33E = 0.7WS - 4
+	return round(avgTemp + (water_vapour_pressure * avgHumidity) - (wind_speed_multiplier * avgWind) - average_multiplier)
+
 ## UPON STARTUP
 area_metadata = addCompassLocation()
 
@@ -66,9 +84,9 @@ def send_menu(message):
 	welcome_greeting = "Weather\n\nLocation: Singapore, Singapore\n\nTemperature: 123\n\nSeason: Tropical\n\n"
 	
 	twoHours = types.KeyboardButton('/twoHours')
-	#twoFourHours = types.KeyboardButton('/24hours')
+	daily = types.KeyboardButton('/daily')
 
-	markup.add(twoHours)
+	markup.add(twoHours, daily)
 
 	bot.send_message(chat_id=message.chat.id, text=welcome_greeting, reply_markup=markup)
 	bot.send_message(chat_id=message.chat.id, text="Hello! What would you like to check out today?", reply_markup=markup)
@@ -163,12 +181,60 @@ def send_region_forecast(message):
 
 	bot.send_message(chat_id=message.chat.id, text=forecast_list)
 
+@bot.message_handler(commands=['daily'])
+def daily_forecast(message):
+
+	# Get 2 hours forecast info
+	bot.reply_to(message, "Printing in your console log, please wait!")
+	response = requests.get(daily_URL)
+	print("response data for daily: ", response.json())
+	bot.send_message(chat_id=message.chat.id, text="Done, please check!")
+
+	# Show general portion
+	# show the 3 weather periods
+	# show the average weather for the next 24 hours
+
+	daily_message = '24-Hour Forecast:\n\n'
+
+	weather = response.json()["items"][0]["general"]["forecast"]
+
+	temperature = response.json()["items"][0]["general"]["temperature"]
+	avgTemp = sum(temperature.values()) / 2
+
+	humidity = response.json()["items"][0]["general"]["relative_humidity"]
+	avgHumidity = sum(humidity.values()) / 2
+
+	wind = response.json()["items"][0]["general"]["wind"]
+	avgWind = sum(wind["speed"].values()) / 2
+
+	daily_message += '*' + str(round(avgTemp)) + '°C* ' + WEATHER_EMOJI[weather] + '\n'
+	daily_message += '_(Feels like: ' + str(heatIndexCalculator(avgTemp, avgHumidity, avgWind)) + "°C)_\n\n"
+
+	daily_message += '🌡 ' + str(temperature["low"]) + ' ~ ' + str(temperature["high"]) + '°C\n\n'
+
+	daily_message += '💧 ' + str(round(avgHumidity)) + '%\n\n'
+
+	daily_message += '💨 ' + str(avgWind) + 'km/h ' + DIRECTION_EMOJI[wind["direction"]] + '\n\n'
+
+	bot.send_message(chat_id=message.chat.id, text=daily_message)
+
+	
+#####################################################
+
 ## Task 20/5
 # 1. do up User-defined constants
-# 1a. add emoji to describe the weather (check NEA for the various weather constatns)
+
+# 1a. add emoji to describe the weather (check NEA for the various weather constatns) [DONE]
 # 2. Clean up and simplify the codes
-# 3. Add 24 hour forecast
+# 3. Add 24 hour forecast [DONE]
 # 3a. Add temperature, humidity (see japanese websites for forecast display ideas)
+
+## Task 25/5
+## 1. change keyboard type for better ease and navigation
+## 2. tidy up 2 hour forecast section
+## 3. polish up 24 four forecast
+## 4. see how you can leverage more on data.gov API stuff - https://beta.data.gov.sg/datasets?topics=environment&formats=API
+## 5. find out more on what a telegram app can do in weather
 
 
 # Let's get the ball rollin'
