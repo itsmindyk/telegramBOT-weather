@@ -11,44 +11,97 @@ from config import *
 bot = telebot.TeleBot(BOT_KEY, parse_mode=None)
 
 ## Functions
-def getDegrees(lat, lon):
+# def getDegrees(lat, lon):
 
-	lat1 = math.radians(SINGAPORE_COORDINATES[0])
-	lon1 = math.radians(SINGAPORE_COORDINATES[1])
-	lat2 = math.radians(lat)
-	lon2 = math.radians(lon)
+# 	lat1 = math.radians(SINGAPORE_COORDINATES[0])
+# 	lon1 = math.radians(SINGAPORE_COORDINATES[1])
+# 	lat2 = math.radians(lat)
+# 	lon2 = math.radians(lon)
 
-	# Compute change in coordinates
-	delta_lon = lon2 - lon1
+# 	# Compute change in coordinates
+# 	delta_lon = lon2 - lon1
 
-	# Compute the bearing
-	x = math.sin(delta_lon) * math.cos(lat2)
-	y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
+# 	# Compute the bearing
+# 	x = math.sin(delta_lon) * math.cos(lat2)
+# 	y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
 
-	initial_bearing = math.atan2(x, y)
+# 	initial_bearing = math.atan2(x, y)
 
-	# Convert the bearing from radians to degrees
-	initial_bearing = math.degrees(initial_bearing)
+# 	# Convert the bearing from radians to degrees
+# 	initial_bearing = math.degrees(initial_bearing)
 
-	# Normalize bearings to the range between 0 to 360 degrees
-	compass_bearing = (initial_bearing + 360) % 360
+# 	# Normalize bearings to the range between 0 to 360 degrees
+# 	compass_bearing = (initial_bearing + 360) % 360
 
-	# compass_brackets = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-	compass_brackets = ["N", "S", "E", "W"]
+# 	# compass_brackets = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+# 	compass_brackets = ["N", "S", "E", "W"]
 
-	index = round(compass_bearing / 90) % 4
+# 	index = round(compass_bearing / 90) % 4
 
-	return compass_brackets[index]
+# 	return compass_brackets[index]
 
 def addCompassLocation():
 	response = requests.get(TWOHOURS_FORECAST_URL).json()
 	area_metadata = response["area_metadata"]
+	print("area_metadata: ", area_metadata)
 
 	for place in area_metadata:
-		place["compass_direction"] = getDegrees(place["label_location"]["latitude"], place["label_location"]["longitude"])
+
+		print("place: ", place)
+		place["compass_direction"] = find_region(place["label_location"]["latitude"], place["label_location"]["longitude"])
+		print("given compass: ", place["compass_direction"])
 		place.pop("label_location", None)
 
 	return area_metadata
+
+def is_within_region(lat, lon, region):
+
+    # Check if a point (lat, lon) is within the bounding box.
+    # The bounding box is defined as (min_lat, min_lon, max_lat, max_lon).
+    min_lat, min_lon, max_lat, max_lon = region
+    return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
+
+def find_region(lat, lon):
+
+	print("in find_region, checking the coords: ", lat, " and lon: ", lon)
+	# Find which bounding box (if any) the point (lat, lon) lies in.
+	# Returns the name of the bounding box or None if the point is not in any bounding box.
+	for region_name, region_box in REGION_AREA.items():
+		print("hi in for loop, checking the region box: ", region_box)
+		print("hi in for loop, region name: ", region_name)
+
+		if is_within_region(lat, lon, region_box):
+			print("its within region")
+			return region_name
+		# else:
+		# 	return None
+		
+		print("going next region to check---------------------------------")
+
+	# return None
+
+def lat_lon_boundary_area(lat, lon, area_sq_km):
+
+    # Approximate conversion factors for latitude and longitude near the equator
+    km_per_deg_lat = 111.1  # 1 degree of latitude is approximately 111 km
+    # km_per_deg_lon = 111.0 * math.cos(math.radians(lat))  # varies with latitude
+    km_per_deg_lon = 111.320 * math.cos(lat)  # varies with latitude
+
+
+    # Calculate the side length of the bounding box
+    side_length_km = math.sqrt(area_sq_km)
+    
+    # Convert side length to degrees
+    delta_lat = side_length_km / km_per_deg_lat
+    delta_lon = side_length_km / km_per_deg_lon
+    
+    # Calculate the bounding box coordinates
+    min_lat = lat - delta_lat / 2
+    max_lat = lat + delta_lat / 2
+    min_lon = lon - delta_lon / 2
+    max_lon = lon + delta_lon / 2
+    
+    return min_lat, min_lon, max_lat, max_lon
 
 def heatIndexCalculator(avgTemp, avgHumidity):
 
@@ -69,39 +122,55 @@ def heatIndexCalculator(avgTemp, avgHumidity):
 	converted_temp = heat_index - 32
 	converted_temp = converted_temp * (5/9)
 
-	return round(converted_temp)	
+	return round(converted_temp)
+    
+def format_datetime(input_datetime, format):
 
-def format_date(input_str_date):
+	dt = datetime.fromisoformat(input_datetime)
 
-    # Convert the input string to a datetime object
-    date_obj = datetime.strptime(input_str_date, '%Y-%m-%d')
-    
-    # Get the day of the week and month names
-    day_name = date_obj.strftime('%A')  # Full weekday name
-    day_number = date_obj.strftime('%d')  # Day of the month
-    month_name = date_obj.strftime('%B')  # Full month name
-    year = date_obj.strftime('%Y')  # Year
-    
-    # Add the appropriate suffix to the day number
-    if day_number.endswith(('1', '21', '31')):
-        suffix = "st"
-    elif day_number.endswith(('2', '22')):
-        suffix = "nd"
-    elif day_number.endswith(('3', '23')):
-        suffix = "rd"
-    else:
-        suffix = "th"
-    
-    # Construct the formatted string
-    return f"{day_name}, {day_number}{suffix}"
-    
+	if format == 'datetime':
+		# Format the datetime
+		formatted = dt.strftime('%d %B, %Y, %I:%M%p').lower()
+
+		# To ensure 'am'/'pm' is correctly formatted
+		return formatted.replace('am', 'am').replace('pm', 'pm')
+	
+	elif format == 'time': #g.g. 11:30pm / 11:30am
+		formatted = dt.strftime("%I:%M%p").lower()
+
+		# Convert to desired format (e.g., "11:30pm")
+		if formatted[0] == '0':  # Remove leading zero if any
+			formatted = formatted[1:]
+		return formatted
+	
+	elif format == 'date': # No year
+		return dt.strftime("%A, %d %B")
+
+	else:
+		print('uhhh error in format_datetime')
+
+def get_UV_indicator(value):
+	for key, value_range in UV_INDEX_LEGEND.items():
+		if value in value_range:
+			return key
+	return None
+
+def format_daily_forecast_section(periods):
+	print("in format_daily_forecast_section: ", periods)
+
+	for period in periods:
+		print("one period: ", period)
+		period["time"]["start"] = format_datetime(period["time"]["start"], 'datetime')
+		period["time"]["end"] = format_datetime(period["time"]["end"], 'datetime')
+
+
 ############# main features #############
 def main_menu(type):
 		
 	menu = types.InlineKeyboardMarkup()
 
 	# Common Routes
-	two = types.InlineKeyboardButton(text="2 Hours", callback_data="two")
+	two = types.InlineKeyboardButton(text="2 Hours Weather", callback_data="two")
 	daily = types.InlineKeyboardButton(text="24 Hours", callback_data="daily")
 	future = types.InlineKeyboardButton(text="4 Days Ahead", callback_data="future")
 
@@ -110,7 +179,7 @@ def main_menu(type):
 
 	if type == "main":
 
-		refresh_current = types.InlineKeyboardButton(text="Refresh current weather", callback_data="current")
+		refresh_current = types.InlineKeyboardButton(text="Refresh current weather (every 5 mins)", callback_data="current")
 		## TO BE ADDED SOON
 		about = types.InlineKeyboardButton(text="About this bot", callback_data="about")
 
@@ -119,14 +188,14 @@ def main_menu(type):
 	
 	elif type == "region":
 		north = types.InlineKeyboardButton(text="North", callback_data="north")
-		south = types.InlineKeyboardButton(text="South", callback_data="south")
+		south = types.InlineKeyboardButton(text="Central (South)", callback_data="south")
 		east = types.InlineKeyboardButton(text="East", callback_data="east")
 		west = types.InlineKeyboardButton(text="West", callback_data="west")
-		# central = types.InlineKeyboardButton(text="Central", callback_data="central")
+		central = types.InlineKeyboardButton(text="Central (North-East)", callback_data="central")
 		all = types.InlineKeyboardButton(text="All Region", callback_data="all")
 
 		menu.row(north, south, east)
-		menu.row(west, all)
+		menu.row(west, central, all)
 		menu.add(back)
 
 	elif type == "daily":
@@ -143,37 +212,30 @@ def currentForecast(call):
 	print("I am the  present!")
 
 	if isinstance(call, CallbackQuery):
-		print("instance is callback!")
 		chat_id = call.message.chat.id
 	elif isinstance(call, Message):
-		print("instance is callback!")
 		chat_id = call.chat.id
 
-	now = datetime.now()
-	current_datetime = now.strftime("%m/%d/%Y, %H:%M")
-	print("date and time:", current_datetime)
+	response = requests.get(FIVE_MINUTE_AIR_TEMP_URL).json()["items"][0]
+	response_date_time = response["timestamp"]
 
-	message = "<u><b>Weather now, " + current_datetime + "</b></u>\n\n"
-
-	response_air_temp = requests.get(FIVE_MINUTE_AIR_TEMP_URL).json()["items"][0]["readings"]
+	response_air_temp = response["readings"]
 	response_humidity = requests.get(FIVE_MINUTE_HUMIDITY_URL).json()["items"][0]["readings"]
-	# response_minute_wind = requests.get(FIVE_MINUTE_WIND_URL).json()["items"][0]
+	response_wind = requests.get(FIVE_MINUTE_WIND_URL).json()["items"][0]["readings"]
 
-	# response_5minute_rainfall = requests.get(TWOHOURS_FORECAST_URL).json()
+	## Retrieved at 2024-06-02T17:00:00+08:00
+	# response_rainfall = requests.get(FIVE_MINUTE_RAINFALL_URL).json()
 
-	# response_UV = requests.get(TWOHOURS_FORECAST_URL).json()
-	# response_PM25 = requests.get(TWOHOURS_FORECAST_URL).json()
-	# response_PSI = requests.get(TWOHOURS_FORECAST_URL).json()
+	response_UV = requests.get(UV_INDEX_URL).json()["items"][0]["index"][0]
+	response_PM25 = requests.get(PM25_URL).json()["items"][0]
+	response_PSI = requests.get(PSI_URL).json()["items"][0]
 
-	# print("5 min - air temp: ", response_air_temp)
-	# print("------------------------------------------------------")
-	# print("5 min - HUMDITITY: ", response_humidity)
-	# print("------------------------------------------------------")
-	# print("5 min - WIND: ", response_minute_wind)
-	# print("------------------------------------------------------")
+	print("response_PM25 API: ", response_PM25)
+	print("response_PSI API: ", response_PSI)
 
 	avgTemp = 0;
 	avgHumidity = 0;
+	avgWind = 0;
 
 	for temp in response_air_temp:
 		temp.pop('station_id')
@@ -181,34 +243,31 @@ def currentForecast(call):
 	for humid in response_humidity:
 		humid.pop('station_id')
 		avgHumidity += humid["value"]
+	for wind in response_wind:
+		wind.pop('station_id')
+		avgWind += wind["value"]
 
 	avgTemp = avgTemp / len(response_air_temp)
 	avgHumidity = avgHumidity / len(response_humidity)
+	avgWind = (avgWind / len(response_wind)) * KNOTS_TO_KMH
 	feels_like_temp = heatIndexCalculator(avgTemp, avgHumidity)
+
+	message = "<u>Temperature now (" + "<b>" + format_datetime(response_date_time, 'datetime') + ")</b></u>\n\n"
 
 	message += "<b>" + str(round(avgTemp)) + "°C</b>\n"
 	message += "<i>(Feels like " + str(feels_like_temp) + "°C)</i>\n\n"
-	message += '💧 ' + str(round(avgHumidity)) + '%\n\n'
+	message += 'Average 💧: ' + str(round(avgHumidity)) + '%\n'
+	message += 'Average 💨: ' + str(round(avgWind)) + 'km/h\n'
+	message += '------------------------------\n' ## 30 lines
+	message += 'UV Index (at ' + str(format_datetime(response_UV["timestamp"], 'time')) + '): ' + str(response_UV["value"]) + get_UV_indicator(response_UV["value"]) + '\n'
 
 	bot.send_message(chat_id=chat_id, text=message, parse_mode='HTML')
 	bot.send_message(chat_id=chat_id, text="Hello! Which forecast do you want to check out today?", reply_markup=main_menu("main"))
 
 def twoHourForecast(call):
 
-	bot.reply_to(call.message, text="2 hours forecast? Hold on, let me ask the bomoh!")
-
-	response = requests.get(TWOHOURS_FORECAST_URL).json()
-	# print("2 hour api: ", response.json())
-	forecasts = response["items"][0]["forecasts"]
-	time_validity = [response["items"][0]["valid_period"]["start"], response["items"][0]["valid_period"]["end"]]
-
-	# Setting the time
-	for i, time in enumerate(time_validity):
-		dt = datetime.fromisoformat(time)
-		local_dt = dt.astimezone()
-		time_validity[i] = local_dt.strftime('%I:%M%p').lower()
-
-	bot.send_message(chat_id=call.message.chat.id, text="Which region would you like to see?", reply_markup=main_menu("region"))
+	bot.reply_to(call.message, text="2 hours forecast? Hold on, let me ask the bomoh to prepare his coconuts...")
+	bot.send_message(chat_id=call.message.chat.id, text="Alright, which region do you want to see?", reply_markup=main_menu("region"))
 
 def filterTwoHourForecastByRegion(call):
 
@@ -216,22 +275,23 @@ def filterTwoHourForecastByRegion(call):
 
 	bot.reply_to(call.message, text=reply_msg)
 
-	forecast_list = ""
+	time_validity = requests.get(TWOHOURS_FORECAST_URL).json()["items"][0]["valid_period"]
+
+	forecast_list = "<u><b>" + call.data.capitalize() + "</b> region, " + str(format_datetime(time_validity["start"], 'time')) + " to " + str(format_datetime(time_validity["end"], 'time')) + "</u>\n\n"
 	compass_filter = ""
 	region_filter_list = []
 
 	# Setting compass filter
 	if (call.data == "north"):
 		compass_filter = "N"
-
 	elif (call.data == "south"): 
-		compass_filter = "S"
-
+		compass_filter = "C"
 	elif (call.data == "east"): 
 		compass_filter = "E"
-
 	elif (call.data == "west"): 
 		compass_filter = "W"
+	elif (call.data == "central"): 
+		compass_filter = "NE"
 	else:
 		compass_filter = ""
 
@@ -247,26 +307,26 @@ def filterTwoHourForecastByRegion(call):
 	if region_filter_list:
 		for place in forecasts:
 			if (place["area"] in region_filter_list):
-				forecast_list += place["area"] + ": " + place["forecast"] + "\n"
+				forecast_list += place["area"] + ": " + place["forecast"] + " " + WEATHER_EMOJI[place["forecast"]] + "\n"
 
 	else: # filter list is empty
 		for place in forecasts:
-			forecast_list += place["area"] + ": " + place["forecast"] + "\n"
+			forecast_list += place["area"] + ": " + place["forecast"] + " " + WEATHER_EMOJI[place["forecast"]] + "\n"
 
-	bot.send_message(chat_id=call.message.chat.id, text=forecast_list)
+	bot.send_message(chat_id=call.message.chat.id, text=forecast_list, parse_mode='HTML')
 	bot.send_message(chat_id=call.message.chat.id, text="Which region would you like to see next?", reply_markup=main_menu("region"))
 
 def dailyForecast(call):
 
 	bot.reply_to(call.message, "Daily forecast? Let me hold up my two coconuts...")
 	response = requests.get(DAILY_FORECAST_URL).json()
-	print("response reply: ", response)
+	print("response daily: ", response)
 
-	## Set time?
-
-	message = '24-Hour forecast, today:\n\n'
-
+	time_validity = response["items"][0]["valid_period"]
 	weather = response["items"][0]["general"]["forecast"]
+	weather_periods = response["items"][0]["periods"]
+	weather_periods = format_daily_forecast_section(weather_periods)
+	# print("weather_periods: ", weather_periods)
 
 	temperature = response["items"][0]["general"]["temperature"]
 	avgTemp = sum(temperature.values()) / 2
@@ -277,13 +337,14 @@ def dailyForecast(call):
 	wind = response["items"][0]["general"]["wind"]
 	avgWind = sum(wind["speed"].values()) / 2
 
+	message = '<u><b>24-Hour forecast</b></u>\n'
+	message += 'From ' +str(format_datetime(time_validity["start"], 'datetime')) + '\n\n'
+
 	message += '<b>' + str(round(avgTemp)) + '°C</b> ' + WEATHER_EMOJI[weather] + '\n'
-	message += '<u>(Feels like: ' + str(heatIndexCalculator(avgTemp, avgHumidity)) + "°C)</u>\n\n"
+	message += '<i>(Feels like: ' + str(heatIndexCalculator(avgTemp, avgHumidity)) + "°C)</i>\n\n"
 
-	message += '🌡 ' + str(temperature["low"]) + ' ~ ' + str(temperature["high"]) + '°C\n\n'
-
-	message += '💧 ' + str(round(avgHumidity)) + '%\n\n'
-
+	message += '🌡 ' + str(temperature["low"]) + ' ~ ' + str(temperature["high"]) + '°C\n'
+	message += '💧 ' + str(round(avgHumidity)) + '%\n'
 	message += '💨 ' + str(avgWind) + 'km/h ' + DIRECTION_EMOJI[wind["direction"]] + '\n'
 
 	## menu
@@ -291,25 +352,17 @@ def dailyForecast(call):
 	bot.send_message(chat_id=call.message.chat.id, text="Which forecast would you like to check out next?", reply_markup=main_menu("daily"))
 
 def futureForecast(call):
-	print("hiya! im 4 days ahead!")
 	bot.reply_to(call.message, text="FOUR DAYS?? Wah... let me hold my coconuts higher...")
 
 	response = requests.get(FUTURE_FORECAST_URL).json()
-	print("api reply: ", response)
+	# print("api reply: ", response)
 	forecasts = response["items"][0]["forecasts"]
-	print("forecasts: ", forecasts)
+	# print("forecasts: ", forecasts)
 
-	# # Setting the time
-	# for i, time in enumerate(time_validity):
-	# 	dt = datetime.fromisoformat(time)
-	# 	local_dt = dt.astimezone()
-	# time_validity[i] = local_dt.strftime('%I:%M%p').lower()
-
-	message = '4 Day Outlook:\n----------------------------------------\n'
+	message = '<b><u>4 Day Outlook</u></b>\n\n'
 
 	# 4 day outlook
 	for day in forecasts:
-		print("one day: ", day)
 
 		temperature = day["temperature"]
 		avgTemp = sum(temperature.values()) / 2
@@ -320,7 +373,7 @@ def futureForecast(call):
 		wind = day["wind"]
 		avgWind = sum(wind["speed"].values()) / 2
 
-		message += format_date(day["date"]) + ":\n\n"
+		message += "<b>" + str(format_datetime(day["date"], 'date')) + "</b>\n\n"
 		time = day["forecast"].split(" ")[0]
 		## TODO: get the "thundery showers and map it to emoji in config"
 		# weather = day["forecast"].split(" ")
@@ -328,7 +381,7 @@ def futureForecast(call):
 		# daily_message += TIME_EMOJI[time] + " " + str(temperature["low"]) + "~" + str(temperature["high"]) + "°C\n"
 		message += '🌡 ' + str(temperature["low"]) + "~" + str(temperature["high"]) + "°C\n"
 		message += "<i>(May feel like " + str(heatIndexCalculator(avgTemp, avgHumidity)) + "°C)</i>\n\n"
-		message += '💧 ' + str(round(avgHumidity)) + '%\n\n'
+		message += '💧 ' + str(round(avgHumidity)) + '%\n'
 		message += '💨 ' + str(avgWind) + 'km/h ' + DIRECTION_EMOJI[wind["direction"]] + '\n'
 		message += '----------------------------------------\n'
 
@@ -342,6 +395,22 @@ def quit(call):
 
 ## UPON STARTUP
 area_metadata = addCompassLocation()
+# print("updated area_metadata: ", area_metadata)
+
+# print('west: ', is_within_region(1.357, 103.987, REGION_AREA["E"]))
+# print('west can west or not: ', is_within_region(1.357, 103.987, REGION_AREA["E"]))
+# print("west region: ", lat_lon_boundary_area(1.35735, 103.7, 201.3))
+# print("west region from wiki: ", lat_lon_boundary_area(1.194398, 103.442381, 201.3))
+# print("east region: ", lat_lon_boundary_area(1.35735, 103.94, 93.1))
+# print("south (central) region: ", lat_lon_boundary_area(1.35735, 103.82, 132.7))
+# print("central (northeast) region: ", lat_lon_boundary_area(1.29587, 103.82, 103.9))
+# print("north region: ", lat_lon_boundary_area(1.41803, 103.82, 134.5))
+
+# area_name = find_region(1.350772, 103.839)
+# if area_name:
+#     print(f"Point is within the bounding box: {area_name}")
+# else:
+#     print("Point is not within any bounding box.")
 
 # Commands
 
@@ -352,8 +421,6 @@ def starting_page(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_all_callbacks(call):
-
-	print("in callback, call data: ", call.data)
 
 	if call.data == "two":
 		twoHourForecast(call)
@@ -368,14 +435,13 @@ def handle_all_callbacks(call):
 	elif call.data =="quit":
 		quit(call)
 
-
 #####################################################
 
 ## Task 27/5
 # 1. put 4 day outlook into a seperate message (too long) [DONE]
 # 1a. split the daily forecast into 6 hour intervals???
-# 2. tidy up 2 hour forecast section
-# 3. work on the current weather info
+# 2. tidy up 2 hour forecast section [MID-DONE - some places is out of range of compass]
+# 3. work on the current weather info [DONE]
 # 3a. add air quality i.e UV index, PM2.5; add chance of rainfall
 
 # Let's get the ball rollin'
