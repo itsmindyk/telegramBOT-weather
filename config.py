@@ -1,4 +1,4 @@
-BOT_KEY = "5767362118:AAHfunShvYIKvwTeDKuccO6DYmPHi1ekIGM"
+BOT_KEY = "7473748101:AAFKTY317ObJqxPjNGS6ktyfibfceEF0ttI"
 
 ## NEA's API
 
@@ -79,14 +79,10 @@ WEATHER_EMOJI = {
     'Partly Cloudy': '⛅️',
     'Cloudy': '☁️',
     'Light Rain': '🌧',
+    'Showers': '🌧',
     'Thundery Showers': '⛈'
 }
 
-TIME_EMOJI = {
-    'Afternoon': '🏙',
-    'Evening': '🌆',
-    'Night': '🌃',
-}
 ## Time examples:
 # "Afternoon thundery showers"
 # "Late morning and early afternoon thundery showers"
