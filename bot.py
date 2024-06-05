@@ -1,4 +1,5 @@
 import math
+import os
 import telebot
 import requests
 from datetime import datetime
@@ -6,9 +7,11 @@ from datetime import datetime
 from telebot import types
 from telebot.types import Message, CallbackQuery
 from config import *
+from keep_alive import keep_alive
 
 # Constants
-bot = telebot.TeleBot(BOT_KEY, parse_mode=None)
+# bot = telebot.TeleBot(BOT_KEY, parse_mode=None)
+bot = telebot.Telebot (token=os.environ.get('BOT_KEY'))
 
 ## Functions
 def addCompassLocation():
@@ -225,7 +228,7 @@ def currentForecast(call):
 
 def twoHourForecast(call):
 
-	bot.reply_to(call.message, text="2 hours forecast? Hold on, let me ask the bomoh to prepare his coconuts...")
+	bot.reply_to(call.message, text="2 hours forecast? Hold on, let me prepare my coconuts...")
 	bot.send_message(chat_id=call.message.chat.id, text="Alright, which region do you want to see?", reply_markup=main_menu("region"))
 
 def filterTwoHourForecastByRegion(call):
@@ -238,7 +241,7 @@ def filterTwoHourForecastByRegion(call):
 	forecasts = response["forecasts"]	
 	time_validity = response["valid_period"]
 
-	forecast_list = "<u><b>" + call.data.capitalize() + "</b> region, " + str(format_datetime(time_validity["start"], 'time')) + " to " + str(format_datetime(time_validity["end"], 'time')) + "</u>\n\n"
+	forecast_list = "<u><b>" + call.data.capitalize() + "</b> region, " + str(format_datetime(time_validity["start"], 'time')) + " - " + str(format_datetime(time_validity["end"], 'time')) + "</u>\n\n"
 	compass_filter = ""
 	region_filter_list = []
 
@@ -273,18 +276,23 @@ def filterTwoHourForecastByRegion(call):
 
 	else: # filter list is empty
 		for place in forecasts:
-			forecast_list += place["area"] + ": " + place["forecast"] + " " + WEATHER_EMOJI[place["forecast"]] + "\n"
+			if len(place["forecast"].split(" ")) > 2:
+				place["forecast"] = place["forecast"].split(" ")
+				place["forecast"].pop()
+				place["forecast"] = ' '.join(place["forecast"])
+			forecast_list += "<b>" + place["area"] + ":</b> " + place["forecast"] + " " + WEATHER_EMOJI[place["forecast"]] + "\n"
 
 	bot.send_message(chat_id=call.message.chat.id, text=forecast_list, parse_mode='HTML')
 	bot.send_message(chat_id=call.message.chat.id, text="Which region would you like to see next?", reply_markup=main_menu("region"))
 
 def dailyForecast(call):
 
-	bot.reply_to(call.message, "Daily forecast? Let me hold up my two coconuts...")
+	bot.reply_to(call.message, "Daily forecast? Let me hold up my coconuts higher...")
 	response = requests.get(DAILY_FORECAST_URL).json()["items"][0]
 
 	time_validity = response["valid_period"]
 	weather = response["general"]["forecast"]
+	print('weather: ', weather)
 
 	temperature = response["general"]["temperature"]
 	avgTemp = sum(temperature.values()) / 2
@@ -305,6 +313,7 @@ def dailyForecast(call):
 	message += '💧 ' + str(round(avgHumidity)) + '%\n'
 	message += '💨 ' + str(avgWind) + 'km/h ' + DIRECTION_EMOJI[wind["direction"]] + '\n'
 	message += '------------------------------\n' ## 30 lines
+
 	for period in response["periods"]:
 		start = period["time"]["start"]
 		end = period["time"]["end"]
@@ -410,17 +419,12 @@ def handle_all_callbacks(call):
 	elif call.data =="quit":
 		quit(call)
 
-#####################################################
-
-## Task 27/5
-# 1. put 4 day outlook into a seperate message (too long) [DONE]
-# 1a. split the daily forecast into 6 hour intervals??? [DONE]
-# 2. tidy up 2 hour forecast section [MID-DONE - some places is out of range of compass] [future]
-# 3. work on the current weather info [DONE]
-# 3a. add air quality i.e UV index, PM2.5; add chance of rainfall
-
 # Let's get the ball rollin'
-bot.polling()
+def main():
+    keep_alive()
+    bot.polling()
 
+if __name__ == '__main__':
+    main()
 
 	
