@@ -11,7 +11,7 @@ from keep_alive import keep_alive
 
 # Constants
 # bot = telebot.TeleBot(BOT_KEY, parse_mode=None)
-bot = telebot.Telebot (token=os.environ.get('BOT_KEY'))
+bot = telebot.Telebot(token=os.environ.get('token'))
 
 ## Functions
 def addCompassLocation():

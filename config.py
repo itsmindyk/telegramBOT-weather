@@ -1,7 +1,3 @@
-BOT_KEY = "7473748101:AAFKTY317ObJqxPjNGS6ktyfibfceEF0ttI"
-
-## NEA's API
-
 # 5 Minute interval
 FIVE_MINUTE_AIR_TEMP_URL = "https://api.data.gov.sg/v1/environment/air-temperature"
 FIVE_MINUTE_HUMIDITY_URL = "https://api.data.gov.sg/v1/environment/relative-humidity"
