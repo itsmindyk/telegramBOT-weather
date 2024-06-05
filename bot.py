@@ -138,7 +138,6 @@ def main_menu(type):
 	future = types.InlineKeyboardButton(text="4 Days Ahead", callback_data="future")
 
 	back = types.InlineKeyboardButton(text="Back to Menu", callback_data="menu")
-	quit = types.InlineKeyboardButton(text="Quit", callback_data="quit")
 
 	if type == "main":
 
@@ -147,7 +146,7 @@ def main_menu(type):
 
 		menu.row(refresh_current)
 		menu.row(two, daily, future)
-		menu.add(quit, about)
+		menu.add(about)
 	
 	elif type == "region":
 		north = types.InlineKeyboardButton(text="North", callback_data="north")
@@ -163,11 +162,11 @@ def main_menu(type):
 
 	elif type == "daily":
 		menu.row(two, future)
-		menu.add(back, quit)
+		menu.add(back)
 
 	elif type == "future":
 		menu.row(two, daily)
-		menu.add(back, quit)
+		menu.add(back)
 
 	return menu
 
@@ -363,10 +362,6 @@ def futureForecast(call):
 	bot.send_message(chat_id=call.message.chat.id, text=message, parse_mode='HTML')
 	bot.send_message(chat_id=call.message.chat.id, text="Which forecast would you like to check out next?", reply_markup=main_menu("future"))
 
-def quit(call):
-	print("its time to shutdown!")
-	bot.stop_polling()
-
 def about_bot_info(call):
 
 	ver_num = 1.0
@@ -416,8 +411,6 @@ def handle_all_callbacks(call):
 		currentForecast(call)
 	elif call.data == "about":
 		about_bot_info(call)
-	elif call.data =="quit":
-		quit(call)
 
 # Let's get the ball rollin'
 def main():
