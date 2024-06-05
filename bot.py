@@ -396,7 +396,7 @@ area_metadata = addCompassLocation()
 # print("north region: ", lat_lon_boundary_area(1.41803, 103.82, 134.5))
 
 # Commands
-@bot.message_handler(commands=["hello"])
+@bot.message_handler(commands=["hello", "start"])
 def starting_page(message):
 
 	currentForecast(message)
